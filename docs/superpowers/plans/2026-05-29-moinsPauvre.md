@@ -2,6 +2,23 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## Statut d'avancement (2026-05-29)
+
+| Tâche | Statut | Notes |
+|---|---|---|
+| Task 1: Project Scaffold | ✅ DONE | Vite+React+TS+Tailwind+PWA+Supabase+Vitest installés |
+| Task 2: Supabase schema + RLS + trigger | ✅ DONE | Migrations écrites dans `supabase/migrations/`. **⚠️ Docker Desktop doit être lancé** puis `npx supabase start && npx supabase db push` pour appliquer |
+| Task 3: Auth | ✅ DONE | `useAuth`, `LoginPage`, `App.tsx` avec auth gate + routes protégées |
+| Task 4: Layout + BottomNav | ⏳ NEXT | Commencer ici à la reprise |
+| Task 5–15 | 🔲 TODO | — |
+
+**Branche git:** `claude/add-claude-documentation-z6Nkf`
+**Dernier commit:** feat: add auth hook, login page, protected routes
+
+**Prérequis avant de tester:** Créer `.env.local` à partir de `.env.example` avec les vraies clés Supabase.
+
+---
+
 **Goal:** PWA mobile permettant de stocker et afficher des codes de réduction / cartes cadeaux groupés par enseigne, avec mode famille et import cashback.
 
 **Architecture:** Architecture centré-enseigne. Chaque enseigne regroupe ses codes, cartes cadeaux et taux cashback. Supabase gère l'auth, la DB et le RLS (chaque user voit uniquement ses données + les données familiales partagées). Les barcodes sont générés côté client par `bwip-js` et affichés en plein écran pour scan en magasin.
