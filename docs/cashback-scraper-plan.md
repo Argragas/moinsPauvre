@@ -72,8 +72,8 @@ un **historique uniquement lorsque le taux change**.
                 │                                                          │
    ┌────────────▼────────────┐   3. matching nom ↔ enseigne_id            │
    │ npm run cashback:ingest │◄──────────────────────────────────────────┘
-   │ (Node + service_role)   │   4. UPDATE enseignes.cashback_pct/source
-   └─────────────────────────┘   5. INSERT cashback_history SI pct changé
+   │ (Node + service_role)   │   4. route par kind (cashback/giftcard/promo)
+   └─────────────────────────┘   5. INSERT offres SI valeur change ; codes→codes_promo
 ```
 
 Le « LLM qui extrait » est **Claude Code lui-même** lisant les pages via Chrome MCP. L'ingestion
@@ -100,61 +100,70 @@ alter table enseignes add column if not exists cashback_updated_at timestamptz;
 > `manual` et `widilo` sont conservés (déjà présents dans le schéma). On ajoute `joko` et `uneo`.
 > Les types TS (`src/lib/types.ts`, `CashbackSource`) seront mis à jour en conséquence.
 
-### 4.2 Nouvelle table `cashback_history`
+### 4.2 Trois natures d'offres scrapées
+
+Une enseigne peut cumuler plusieurs types de réduction selon les sources :
+
+| `kind` | Définition | Exemple | Donnée clé |
+|---|---|---|---|
+| `cashback` | % rendu après achat | iGraal Carrefour 4% | `remise_pct` |
+| `giftcard` | **carte cadeau à prix réduit** : carte 100€ payée 95€ | Unéo Carrefour −5% | `remise_pct` (+ montants dispo) |
+| `promo` | code de réduction à saisir | Code « ÉTÉ10 » | `code` + `valeur` |
+
+`cashback` et `giftcard` sont **des taux** (mêmes mécaniques, table commune §4.3). `promo` a un
+**code** → va dans la table existante `codes_promo` (§4.5). Les `cartes_cadeaux` (cartes
+*possédées*, avec solde) restent **saisies manuellement** : un site ne te donne le vrai code
+qu'après achat — le scraper ne stocke que **l'offre** (« carte Carrefour dispo à −5% chez Unéo »).
+
+### 4.3 Table unifiée des taux scrapés `offres`
+
+Remplace l'idée d'une table `cashback_history` dédiée : une seule table couvre cashback **et**
+remises carte cadeau, avec l'historique intégré (append-on-change).
 
 ```sql
--- même migration
-create table cashback_history (
+-- supabase/migrations/20260601000001_cashback_sources.sql
+create table offres (
   id uuid primary key default gen_random_uuid(),
   enseigne_id uuid references enseignes on delete cascade not null,
   source text not null
     check (source in ('manual', 'igraal', 'widilo', 'joko', 'uneo')),
-  cashback_pct numeric,
+  kind text not null check (kind in ('cashback', 'giftcard')),
+  remise_pct numeric,            -- % cashback OU % remise sur la carte cadeau
+  montants numeric[],            -- montants de cartes dispo (giftcard), nullable
   conditions text,
   scraped_at timestamptz default now()
 );
 
-create index cashback_history_enseigne_idx
-  on cashback_history (enseigne_id, source, scraped_at desc);
-```
+-- "valeur courante" = ligne la plus récente par (enseigne, source, kind)
+create index offres_courant_idx on offres (enseigne_id, source, kind, scraped_at desc);
 
-RLS (cohérent avec le reste du schéma) : un utilisateur ne voit l'historique que des enseignes
-qui lui appartiennent.
-
-```sql
-alter table cashback_history enable row level security;
-create policy "history_select_own" on cashback_history for select
+alter table offres enable row level security;
+create policy "offres_select_own" on offres for select
   using (exists (
     select 1 from enseignes e
-    where e.id = cashback_history.enseigne_id and e.user_id = auth.uid()
+    where e.id = offres.enseigne_id and e.user_id = auth.uid()
   ));
--- INSERT se fait via service_role (bypass RLS), pas de policy d'insert côté client.
+-- INSERT via service_role (bypass RLS), pas de policy d'insert côté client.
 ```
 
-### 4.3 Règle « historique seulement si le taux change »
+> `enseignes.cashback_pct` reste alimentée (dénormalisation) pour `kind='cashback'`, afin que les
+> écrans actuels continuent de fonctionner sans refonte. Les remises `giftcard` se lisent depuis
+> `offres`.
 
-À l'ingestion, pour chaque `(enseigne_id, source)` :
-1. lire la dernière ligne d'historique (`order by scraped_at desc limit 1`) ;
-2. comparer `cashback_pct` (et `conditions`) à la valeur scrapée ;
-3. **INSERT dans `cashback_history` uniquement si différent** (ou s'il n'existe aucune ligne) ;
-4. dans tous les cas, `UPDATE enseignes` avec la valeur courante + `cashback_updated_at = now()`,
-   **sauf** si `cashback_source = 'manual'` (on ne piétine pas une saisie manuelle de l'utilisateur).
+### 4.4 Règle « historique seulement si la valeur change »
 
-### 4.4 Une enseigne = cashback ET/OU codes
+À l'ingestion, pour chaque `(enseigne_id, source, kind)` :
+1. lire la ligne la plus récente (`order by scraped_at desc limit 1`) ;
+2. comparer `remise_pct` (+ `montants`, `conditions`) à la valeur scrapée ;
+3. **INSERT dans `offres` uniquement si différent** (ou s'il n'existe aucune ligne) — d'où un
+   historique qui ne grossit qu'aux vrais changements ;
+4. pour `kind='cashback'` : `UPDATE enseignes.cashback_pct` + `cashback_updated_at = now()`,
+   **sauf** si `cashback_source = 'manual'` (on ne piétine pas une saisie manuelle).
 
-Chaque enseigne peut porter, selon la source, **du cashback (%)** et/ou **des codes
-(promo / carte cadeau)**, ou les deux. Le scraper produit pour chaque offre un champ
-`kind` (`'cashback' | 'promo'`) et l'ingestion route vers la bonne table :
+### 4.5 Codes promo
 
-| `kind` | Source typique | Destination |
-|---|---|---|
-| `cashback` | iGraal, Joko, (Unéo si %) | `enseignes.cashback_pct` + `cashback_history` (§4.1–§4.3) |
-| `promo` | Unéo, codes affichés sur iGraal/Joko | table existante **`codes_promo`** (`code`, `valeur`, `type_valeur` `'pct'|'eur'`) |
-
-> Les **cartes cadeaux** (`cartes_cadeaux`) restent **saisies manuellement** par l'utilisateur :
-> ce sont des codes personnels avec solde, qu'un site de cashback ne fournit pas. Le scraper ne
-> les touche pas. Stockage Unéo retenu : réutiliser `codes_promo` (cohérent avec l'écran
-> « Codes promo » de l'app).
+`kind='promo'` → table existante **`codes_promo`** (`code`, `valeur`, `type_valeur` `'pct'|'eur'`,
+`format_barcode`), cohérent avec l'écran « Codes promo » de l'app.
 
 ---
 
@@ -191,6 +200,8 @@ IGRAAL_EMAIL=
 IGRAAL_PASSWORD=
 JOKO_EMAIL=
 JOKO_PASSWORD=
+UNEO_EMAIL=
+UNEO_PASSWORD=
 ```
 
 Dépendances dev à ajouter : `tsx` (exécution TS), `dotenv`. Le serveur Chrome MCP
@@ -211,7 +222,8 @@ Décrite dans le skill `scrape-cashback`. Pour chaque site de `config.ts` :
 - pour chaque enseigne de `enseignes.json` : utiliser la recherche du site, ouvrir la fiche,
   lire taux + conditions ;
 - temporiser entre requêtes (ex. 2–4 s) ;
-- accumuler dans `results.json` : `[{source, nom_site, cashback_pct, conditions}]`.
+- accumuler dans `results.json` : `[{source, nom_site, kind, remise_pct?, montants?, code?, valeur?, conditions}]`
+  où `kind ∈ 'cashback'|'giftcard'|'promo'` (§4.2).
 
 ### 6.3 `normalize.ts`
 Normalisation pour le matching nom site ↔ nom DB : minuscules, sans accents, sans espaces/
@@ -221,8 +233,9 @@ les cas tordus (ex. « Fnac.com » → « fnac »).
 ### 6.4 `ingest.ts`
 - charge `results.json` + `enseignes.json` ;
 - matche chaque offre à une enseigne (exact normalisé, puis alias ; sinon → rapport « non matché ») ;
-- applique la règle §4.3 (diff historique + update courant) ;
-- affiche un résumé : N mis à jour, M inchangés, K non matchés, L insérés en historique.
+- route par `kind` : `cashback`/`giftcard` → table `offres` (diff §4.4) ; `promo` → `codes_promo` ;
+- pour `cashback`, met aussi à jour `enseignes.cashback_pct` (sauf source `manual`) ;
+- affiche un résumé : N taux mis à jour, M inchangés, K non matchés, P codes promo ajoutés.
 
 ---
 
@@ -259,8 +272,9 @@ clé API LLM + coût par run. Le reste du pipeline (migration, ingest, historiqu
    Portail d'avantages de mutuelle → offres = remises/codes promo (voir §4.4, option A
    recommandée : alimenter `codes_promo`). Site **anti-bot (403)** → navigateur obligatoire.
 2. **Joko — résolu.** Site web : `home.joko.com` (anti-bot 403, navigateur requis). Reste en v1.
-3. **Stockage des codes — résolu.** Cashback % → `enseignes`/`cashback_history` ; codes (Unéo,
-   etc.) → table existante `codes_promo` ; cartes cadeaux → manuelles, non scrapées (§4.4).
+3. **Stockage — résolu (§4).** Cashback % et **cartes cadeaux à remise** → table `offres`
+   (avec `enseignes.cashback_pct` dénormalisée) ; codes promo → `codes_promo` ; cartes cadeaux
+   possédées → manuelles, non scrapées.
 4. **`SCRAPE_USER_ID`** — confirmer qu'on scrape pour un seul compte (le tien) en v1.
 5. **Identifiants** — logins iGraal / Joko / Unéo à fournir via `.env` local au moment de
    l'implémentation/des tests (jamais commités).
@@ -269,7 +283,7 @@ clé API LLM + coût par run. Le reste du pipeline (migration, ingest, historiqu
 
 ## 10. Lot de livraison (ordre d'implémentation)
 
-1. Migration SQL (`enseignes` + `cashback_history` + RLS) et MAJ `src/lib/types.ts`.
+1. Migration SQL (`enseignes` étendu + table `offres` + RLS) et MAJ `src/lib/types.ts`.
 2. Scripts Node : `client.ts`, `list-enseignes.ts`, `normalize.ts`, `ingest.ts` + scripts npm.
 3. `.mcp.json` (Chrome MCP) + skill `.claude/skills/scrape-cashback/SKILL.md`.
 4. MAJ `.env.example` + section README « Mettre à jour les taux de cashback ».
