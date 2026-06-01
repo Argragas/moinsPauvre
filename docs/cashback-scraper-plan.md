@@ -38,10 +38,10 @@ un **historique uniquement lorsque le taux change**.
    chaque site. Moins de requêtes, plus respectueux des sites.
 4. **Légal / ToS.** Le scraping de ces sites peut être contraire à leurs CGU. Usage personnel,
    faible volume, délais entre requêtes, pas de revente des données. À assumer côté utilisateur.
-5. **Sites anti-bot.** Vérifié le 2026-06-01 : `groupe-uneo.fr` renvoie **403 Forbidden** à une
-   requête HTTP simple (sans navigateur). Confirme qu'un vrai navigateur headless est obligatoire
-   et qu'il faut un comportement « humain » : login réel, en-têtes/UA navigateur, délais entre
-   actions. Une approche `fetch`/`curl` est exclue d'emblée.
+5. **Sites anti-bot.** Vérifié le 2026-06-01 : `groupe-uneo.fr` **et** `home.joko.com` renvoient
+   **403 Forbidden** à une requête HTTP simple (sans navigateur). Confirme qu'un vrai navigateur
+   headless est obligatoire et qu'il faut un comportement « humain » : login réel, en-têtes/UA
+   navigateur, délais entre actions. Une approche `fetch`/`curl` est exclue d'emblée.
 6. **Types d'offres hétérogènes.** iGraal/Joko exposent un **taux de cashback %**. Unéo est un
    **portail d'avantages de mutuelle** : ses offres sont surtout des **remises € ou codes promo
    partenaires**, pas un cashback %. Le pipeline doit gérer ces deux natures de données
@@ -140,19 +140,21 @@ create policy "history_select_own" on cashback_history for select
 4. dans tous les cas, `UPDATE enseignes` avec la valeur courante + `cashback_updated_at = now()`,
    **sauf** si `cashback_source = 'manual'` (on ne piétine pas une saisie manuelle de l'utilisateur).
 
-### 4.4 Cashback (%) vs avantages partenaires (Unéo)
+### 4.4 Une enseigne = cashback ET/OU codes
 
-- **iGraal / Joko** → taux en % → alimentent `enseignes.cashback_pct` + `cashback_history`
-  (logique §4.1–§4.3).
-- **Unéo** → remises € ou codes promo → ne sont **pas** un cashback %. Deux options à trancher
-  à l'implémentation :
-  - **(A) Réutiliser la table existante `codes_promo`** (`valeur`, `type_valeur` `'pct'|'eur'`,
-    `code`) — déjà dans le schéma, cohérent avec l'écran « Codes promo » de l'app. Recommandé.
-  - **(B)** Étendre `cashback_history` avec `type_valeur` + `conditions` pour stocker aussi des
-    remises € génériques sans code.
+Chaque enseigne peut porter, selon la source, **du cashback (%)** et/ou **des codes
+(promo / carte cadeau)**, ou les deux. Le scraper produit pour chaque offre un champ
+`kind` (`'cashback' | 'promo'`) et l'ingestion route vers la bonne table :
 
-  Le scraper produit un champ `kind` (`'cashback' | 'promo'`) par offre ; l'ingestion route vers
-  `enseignes`/`cashback_history` (cashback) ou `codes_promo` (promo) selon `kind`.
+| `kind` | Source typique | Destination |
+|---|---|---|
+| `cashback` | iGraal, Joko, (Unéo si %) | `enseignes.cashback_pct` + `cashback_history` (§4.1–§4.3) |
+| `promo` | Unéo, codes affichés sur iGraal/Joko | table existante **`codes_promo`** (`code`, `valeur`, `type_valeur` `'pct'|'eur'`) |
+
+> Les **cartes cadeaux** (`cartes_cadeaux`) restent **saisies manuellement** par l'utilisateur :
+> ce sont des codes personnels avec solde, qu'un site de cashback ne fournit pas. Le scraper ne
+> les touche pas. Stockage Unéo retenu : réutiliser `codes_promo` (cohérent avec l'écran
+> « Codes promo » de l'app).
 
 ---
 
@@ -256,13 +258,12 @@ clé API LLM + coût par run. Le reste du pipeline (migration, ingest, historiqu
 1. **Unéo — résolu.** URL : `groupe-uneo.fr/avantage-avec-uneo`. Login requis, **sans 2FA**.
    Portail d'avantages de mutuelle → offres = remises/codes promo (voir §4.4, option A
    recommandée : alimenter `codes_promo`). Site **anti-bot (403)** → navigateur obligatoire.
-2. **Joko** est surtout une app mobile ; à vérifier en début d'implémentation qu'une interface web
-   exploitable existe. Sinon le retirer de la v1 (ou envisager le scraping via l'app — hors scope).
-3. **Stockage Unéo** — confirmer l'option §4.4 : **(A)** réutiliser `codes_promo` *(recommandé)*
-   ou **(B)** étendre `cashback_history`.
+2. **Joko — résolu.** Site web : `home.joko.com` (anti-bot 403, navigateur requis). Reste en v1.
+3. **Stockage des codes — résolu.** Cashback % → `enseignes`/`cashback_history` ; codes (Unéo,
+   etc.) → table existante `codes_promo` ; cartes cadeaux → manuelles, non scrapées (§4.4).
 4. **`SCRAPE_USER_ID`** — confirmer qu'on scrape pour un seul compte (le tien) en v1.
-5. **Identifiants** — login Unéo (et iGraal/Joko si nécessaire) à fournir via `.env` local au
-   moment de l'implémentation/des tests (jamais commités).
+5. **Identifiants** — logins iGraal / Joko / Unéo à fournir via `.env` local au moment de
+   l'implémentation/des tests (jamais commités).
 
 ---
 
