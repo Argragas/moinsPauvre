@@ -4,3 +4,7 @@ dist
 .env
 .superpowers/
 .idea/
+
+# Artefacts runtime du scraper cashback
+scripts/cashback/enseignes.json
+scripts/cashback/results.json

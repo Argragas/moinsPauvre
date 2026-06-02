@@ -43,6 +43,33 @@ export default defineConfig([
 ])
 ```
 
+## Mettre à jour les réductions (scraper cashback)
+
+Routine locale qui récupère, par enseigne, le cashback (%) et les remises sur cartes cadeaux
+depuis iGraal, Joko et Unéo, puis les enregistre dans Supabase. Les sites n'ont pas d'API et sont
+anti-bot : un navigateur réel est piloté via le serveur MCP `chrome-devtools` (cf. `.mcp.json`).
+Le plan détaillé est dans [`docs/cashback-scraper-plan.md`](docs/cashback-scraper-plan.md).
+
+### Configuration
+Renseigner dans `.env.local` (jamais committé) — voir `.env.example` :
+
+```
+SUPABASE_SERVICE_ROLE_KEY=...   # clé service_role, scripts locaux uniquement
+SCRAPE_USER_ID=...              # UUID du compte pour lequel on scrape
+IGRAAL_EMAIL= / JOKO_EMAIL= / UNEO_EMAIL=  + mots de passe selon login requis
+```
+
+### Utilisation
+1. Appliquer la migration : `supabase db push` (table `offres`, sources étendues).
+2. `npm run cashback:list` — exporte les enseignes cibles dans `scripts/cashback/enseignes.json`.
+3. Dans Claude Code : lancer le skill **`/scrape-cashback`** — Claude ouvre le navigateur, se
+   connecte si besoin, lit les réductions et écrit `scripts/cashback/results.json`.
+4. `npm run cashback:ingest` — matche les noms et écrit en base : table `offres` (nouvelle ligne
+   **seulement si le taux change**), `enseignes.cashback_pct` (cashback), `codes_promo` (codes).
+
+Les fichiers `enseignes.json` / `results.json` sont des artefacts runtime (gitignorés).
+
+
 You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
 ```js
@@ -71,3 +98,30 @@ export default defineConfig([
   },
 ])
 ```
+
+## Mettre à jour les réductions (scraper cashback)
+
+Routine locale qui récupère, par enseigne, le cashback (%) et les remises sur cartes cadeaux
+depuis iGraal, Joko et Unéo, puis les enregistre dans Supabase. Les sites n'ont pas d'API et sont
+anti-bot : un navigateur réel est piloté via le serveur MCP `chrome-devtools` (cf. `.mcp.json`).
+Le plan détaillé est dans [`docs/cashback-scraper-plan.md`](docs/cashback-scraper-plan.md).
+
+### Configuration
+Renseigner dans `.env.local` (jamais committé) — voir `.env.example` :
+
+```
+SUPABASE_SERVICE_ROLE_KEY=...   # clé service_role, scripts locaux uniquement
+SCRAPE_USER_ID=...              # UUID du compte pour lequel on scrape
+IGRAAL_EMAIL= / JOKO_EMAIL= / UNEO_EMAIL=  + mots de passe selon login requis
+```
+
+### Utilisation
+1. Appliquer la migration : `supabase db push` (table `offres`, sources étendues).
+2. `npm run cashback:list` — exporte les enseignes cibles dans `scripts/cashback/enseignes.json`.
+3. Dans Claude Code : lancer le skill **`/scrape-cashback`** — Claude ouvre le navigateur, se
+   connecte si besoin, lit les réductions et écrit `scripts/cashback/results.json`.
+4. `npm run cashback:ingest` — matche les noms et écrit en base : table `offres` (nouvelle ligne
+   **seulement si le taux change**), `enseignes.cashback_pct` (cashback), `codes_promo` (codes).
+
+Les fichiers `enseignes.json` / `results.json` sont des artefacts runtime (gitignorés).
+
