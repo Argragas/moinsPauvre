@@ -23,6 +23,9 @@ export function normalizeName(raw: string): string {
 export const ALIASES: Record<string, string> = {
   fnacdarty: 'fnac',
   laredoute: 'redoute',
+  // Doublons cross-source confirmés (Unéo ↔ iGraal pour le même marchand)
+  nintendoeshopcard: 'nintendoeshop', // Unéo "Nintendo Eshop Card" = iGraal "Nintendo eShop"
+  cartecadeausteamviastartselect: 'steam', // iGraal "Carte Cadeau Steam (via Startselect)" = Unéo "Steam"
 }
 
 /** Applique la normalisation puis un éventuel alias. */

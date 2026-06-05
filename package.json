@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "cashback:list": "tsx scripts/cashback/list-enseignes.ts",
-    "cashback:ingest": "tsx scripts/cashback/ingest.ts"
+    "cashback:ingest": "tsx scripts/cashback/ingest.ts",
+    "cashback:dedup": "tsx scripts/cashback/dedup.ts",
+    "cashback:drop-foreign": "tsx scripts/cashback/drop-foreign.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.2",
@@ -37,6 +39,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.6.0",
     "jsdom": "^29.1.1",
+    "supabase": "^2.104.0",
     "tsx": "^4.22.4",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",

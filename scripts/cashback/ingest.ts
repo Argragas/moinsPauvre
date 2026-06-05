@@ -1,9 +1,8 @@
 import { readFileSync } from 'node:fs'
-import { admin, SCRAPE_USER_ID } from './client.ts'
-import { canonicalName } from './normalize.ts'
+import { admin, fetchAllEnseignes, SCRAPE_USER_ID } from './client.ts'
+import { canonicalName, normalizeName } from './normalize.ts'
 import type { EnseigneRef, ScrapedOffer } from './types.ts'
 
-const ENSEIGNES = 'scripts/cashback/enseignes.json'
 const RESULTS = process.argv[2] ?? 'scripts/cashback/results.json'
 
 function numEq(a: unknown, b: unknown): boolean {
@@ -23,6 +22,28 @@ function arrEq(a: unknown, b: unknown): boolean {
 
 function strEq(a: unknown, b: unknown): boolean {
   return (a ?? null) === (b ?? null)
+}
+
+async function upsertEnseigne(nom_site: string, byName: Map<string, EnseigneRef>): Promise<EnseigneRef> {
+  const key = canonicalName(nom_site)
+  const hit = byName.get(key)
+  if (hit) return hit
+
+  const { data, error } = await admin
+    .from('enseignes')
+    .insert({ nom: nom_site, user_id: SCRAPE_USER_ID })
+    .select('id, nom, cashback_source')
+    .single()
+  if (error) throw error
+
+  const ref: EnseigneRef = {
+    id: data.id,
+    nom: data.nom,
+    nom_normalise: normalizeName(data.nom),
+    cashback_source: data.cashback_source,
+  }
+  byName.set(key, ref)
+  return ref
 }
 
 async function ingestRate(ref: EnseigneRef, offer: ScrapedOffer) {
@@ -101,24 +122,31 @@ async function ingestPromo(ref: EnseigneRef, offer: ScrapedOffer): Promise<boole
 }
 
 async function main() {
-  const enseignes: EnseigneRef[] = JSON.parse(readFileSync(ENSEIGNES, 'utf8'))
   const offers: ScrapedOffer[] = JSON.parse(readFileSync(RESULTS, 'utf8'))
 
+  // Charger les enseignes existantes depuis la DB (paginé : > 1000 possibles)
+  const existing = await fetchAllEnseignes()
+
   const byName = new Map<string, EnseigneRef>()
-  for (const e of enseignes) byName.set(canonicalName(e.nom), e)
+  for (const e of existing) {
+    byName.set(canonicalName(e.nom), {
+      id: e.id,
+      nom: e.nom,
+      nom_normalise: normalizeName(e.nom),
+      cashback_source: e.cashback_source,
+    })
+  }
 
   let ratesChanged = 0
   let ratesUnchanged = 0
   let promosAdded = 0
   let promosSkipped = 0
-  const unmatched: string[] = []
+  let enseignesCreated = 0
 
   for (const offer of offers) {
-    const ref = byName.get(canonicalName(offer.nom_site))
-    if (!ref) {
-      unmatched.push(`${offer.source}: ${offer.nom_site}`)
-      continue
-    }
+    const existedBefore = byName.has(canonicalName(offer.nom_site))
+    const ref = await upsertEnseigne(offer.nom_site, byName)
+    if (!existedBefore) enseignesCreated++
 
     if (offer.kind === 'promo') {
       if (await ingestPromo(ref, offer)) promosAdded++
@@ -129,12 +157,9 @@ async function main() {
     }
   }
 
+  console.log(`Enseignes créées : ${enseignesCreated}`)
   console.log(`Taux : ${ratesChanged} mis à jour, ${ratesUnchanged} inchangés`)
   console.log(`Codes promo : ${promosAdded} ajoutés, ${promosSkipped} déjà présents`)
-  if (unmatched.length) {
-    console.log(`Non matchés (${unmatched.length}) :`)
-    for (const u of unmatched) console.log(`  - ${u}`)
-  }
 }
 
 main().catch((err) => {

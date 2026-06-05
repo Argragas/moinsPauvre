@@ -20,14 +20,14 @@ export const SOURCES: SourceConfig[] = [
     kinds: ['cashback'],
     notes: "Cashback %. Recherche d'enseigne via la barre de recherche du site.",
   },
-  {
-    id: 'joko',
-    nom: 'Joko',
-    url: 'https://home.joko.com',
-    requiresLogin: true,
-    kinds: ['cashback'],
-    notes: 'Cashback %. Site anti-bot (403), login requis.',
-  },
+  // {
+  //   id: 'joko',
+  //   nom: 'Joko',
+  //   url: 'https://home.joko.com',
+  //   requiresLogin: true,
+  //   kinds: ['cashback'],
+  //   notes: 'Cashback %. Site anti-bot (403), login requis.',
+  // },
   {
     id: 'uneo',
     nom: 'Unéo',
