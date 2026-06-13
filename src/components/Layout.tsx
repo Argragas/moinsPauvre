@@ -1,5 +1,15 @@
 import { type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
+import { TabBar } from './TabBar'
+
+const TAB_ROUTES = ['/', '/famille', '/cashback', '/archives']
 
 export function Layout({ children }: { children: ReactNode }) {
-  return <div className="min-h-screen bg-slate-900">{children}</div>
+  const { pathname } = useLocation()
+  return (
+    <>
+      {children}
+      {TAB_ROUTES.includes(pathname) && <TabBar />}
+    </>
+  )
 }

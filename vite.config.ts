@@ -12,8 +12,8 @@ export default defineConfig({
       manifest: {
         name: 'MoinsPauvre',
         short_name: 'MoinsPauvre',
-        theme_color: '#0f3460',
-        background_color: '#0f172a',
+        theme_color: '#090C13',
+        background_color: '#090C13',
         display: 'standalone',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },

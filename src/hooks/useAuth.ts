@@ -25,5 +25,7 @@ export function useAuth() {
 
   const logout = () => supabase.auth.signOut()
 
-  return { session, loading, login, register, logout }
+  const loginWithApple = () => supabase.auth.signInWithOAuth({ provider: 'apple' })
+
+  return { session, loading, login, register, logout, loginWithApple }
 }

@@ -10,6 +10,7 @@ import { FamillePage } from './pages/FamillePage'
 import { CashbackPage } from './pages/CashbackPage'
 import { ArchivesPage } from './pages/ArchivesPage'
 import { Layout } from './components/Layout'
+import { ToastProvider } from './components/ToastProvider'
 
 function ProtectedRoutes() {
   return (
@@ -31,10 +32,14 @@ function ProtectedRoutes() {
 
 export function App() {
   const { session, loading } = useAuth()
-  if (loading) return <div className="min-h-screen bg-slate-900" />
+  if (loading) return <div className="app" />
   return (
     <BrowserRouter>
-      {session ? <ProtectedRoutes /> : <LoginPage />}
+      <ToastProvider>
+        <div className="app">
+          {session ? <ProtectedRoutes /> : <LoginPage />}
+        </div>
+      </ToastProvider>
     </BrowserRouter>
   )
 }
