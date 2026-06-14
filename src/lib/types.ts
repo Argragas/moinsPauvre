@@ -1,7 +1,8 @@
 export type BarcodeFormat = 'EAN13' | 'CODE128' | 'QR' | 'AZTEC'
 export type Visibility = 'personal' | 'family'
 export type FamilleRole = 'owner' | 'member'
-export type CashbackSource = 'manual' | 'igraal' | 'widilo'
+export type CashbackSource = 'manual' | 'igraal' | 'widilo' | 'joko' | 'uneo'
+export type OffreKind = 'cashback' | 'giftcard'
 export type TypeValeur = 'pct' | 'eur'
 
 export interface Enseigne {
@@ -12,7 +13,20 @@ export interface Enseigne {
   cashback_pct: number | null
   cashback_source: CashbackSource | null
   cashback_source_id: string | null
+  cashback_conditions: string | null
+  cashback_updated_at: string | null
   created_at: string
+}
+
+export interface Offre {
+  id: string
+  enseigne_id: string
+  source: CashbackSource
+  kind: OffreKind
+  remise_pct: number | null
+  montants: number[] | null
+  conditions: string | null
+  scraped_at: string
 }
 
 export interface CarteCadeau {

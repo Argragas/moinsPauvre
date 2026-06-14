@@ -13,6 +13,17 @@ export interface EnseigneDisplay {
   fg: string
   cashbackPct: number | null
   cashbackSource: CashbackSource | null
+  cashbackConditions?: string | null
+  cashbackUpdatedAt?: string | null
+}
+
+export interface OffreDisplay {
+  id: string
+  enseigneId: string
+  source: CashbackSource
+  remisePct: number
+  montants: number[]
+  conditions: string | null
 }
 
 export interface CarteCadeauDisplay {
@@ -76,14 +87,20 @@ export interface ArchiveItem {
 export const ME = { id: 'u1', name: 'Camille', initials: 'CM', color: '#3E7BFA' }
 
 export const ENSEIGNES: EnseigneDisplay[] = [
-  { id: 'e1', nom: 'Sephora', mark: 'S', color: '#1A1A1A', fg: '#fff', cashbackPct: 6, cashbackSource: 'igraal' },
+  { id: 'e1', nom: 'Sephora', mark: 'S', color: '#1A1A1A', fg: '#fff', cashbackPct: 6, cashbackSource: 'igraal', cashbackConditions: 'Hors French Days', cashbackUpdatedAt: '12 juin' },
   { id: 'e2', nom: 'Decathlon', mark: 'D', color: '#0082C3', fg: '#fff', cashbackPct: 4, cashbackSource: 'widilo' },
   { id: 'e3', nom: 'Fnac', mark: 'F', color: '#E8C400', fg: '#1A1A1A', cashbackPct: 3, cashbackSource: 'manual' },
   { id: 'e4', nom: 'IKEA', mark: 'IK', color: '#0058A3', fg: '#FFDB00', cashbackPct: 2.5, cashbackSource: 'igraal' },
   { id: 'e5', nom: 'Zara', mark: 'Z', color: '#000000', fg: '#fff', cashbackPct: null, cashbackSource: null },
-  { id: 'e6', nom: 'Carrefour', mark: 'C', color: '#0058A9', fg: '#fff', cashbackPct: 1.5, cashbackSource: 'igraal' },
+  { id: 'e6', nom: 'Carrefour', mark: 'C', color: '#0058A9', fg: '#fff', cashbackPct: 1.5, cashbackSource: 'igraal', cashbackConditions: 'Hors produits high-tech', cashbackUpdatedAt: '10 juin' },
   { id: 'e7', nom: 'Leroy Merlin', mark: 'LM', color: '#78BE20', fg: '#0E3A12', cashbackPct: 4.5, cashbackSource: 'manual' },
   { id: 'e8', nom: 'Naturalia', mark: 'N', color: '#5B8C2A', fg: '#fff', cashbackPct: 5, cashbackSource: 'widilo' },
+]
+
+export const OFFRES: OffreDisplay[] = [
+  { id: 'o1', enseigneId: 'e6', source: 'uneo', remisePct: 5, montants: [25, 50, 100], conditions: 'Carte cadeau multi-enseignes' },
+  { id: 'o2', enseigneId: 'e2', source: 'uneo', remisePct: 8, montants: [30, 50], conditions: 'Valable 1 an' },
+  { id: 'o3', enseigneId: 'e4', source: 'uneo', remisePct: 6, montants: [25, 50, 100, 200], conditions: null },
 ]
 
 export const CARTES: CarteCadeauDisplay[] = [
@@ -127,6 +144,7 @@ export const FAMILLE = {
 export const SOURCES: CashbackSourceInfo[] = [
   { id: 'igraal', nom: 'iGraal', color: '#E2007A', connected: true, enseignes: 24, maj: 'il y a 2 h' },
   { id: 'widilo', nom: 'Widilo', color: '#00B5A5', connected: true, enseignes: 11, maj: 'hier' },
+  { id: 'uneo', nom: 'Unéo', color: '#0F8A5F', connected: true, enseignes: 6, maj: 'il y a 3 j' },
   { id: 'manual', nom: 'Saisie manuelle', color: '#5A6479', connected: true, enseignes: 2, maj: '—' },
 ]
 
@@ -139,6 +157,9 @@ export const ARCHIVES: ArchiveItem[] = [
 
 export const ens = (id: string): EnseigneDisplay =>
   ENSEIGNES.find(e => e.id === id) ?? ENSEIGNES[0]
+
+export const giftcardOffres = (enseigneId: string): OffreDisplay[] =>
+  OFFRES.filter(o => o.enseigneId === enseigneId)
 
 export const euro = (n: number) => {
   const s = n.toLocaleString('fr-FR', { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })
@@ -158,5 +179,7 @@ export const valeurTxt = (c: { typeValeur: TypeValeur; valeur: number }) =>
 export const sourceLabel: Record<CashbackSource, string> = {
   igraal: 'iGraal',
   widilo: 'Widilo',
+  joko: 'Joko',
+  uneo: 'Unéo',
   manual: 'Saisie manuelle',
 }

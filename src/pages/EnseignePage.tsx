@@ -2,7 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Icon } from '../components/Icon'
 import { LogoTile } from '../components/LogoTile'
 import { FamilyBadge } from '../components/FamilyBadge'
-import { ens, euro, fmtLabel, valeurTxt, sourceLabel, CARTES, CODES } from '../lib/mockData'
+import { ens, euro, fmtLabel, valeurTxt, sourceLabel, giftcardOffres, CARTES, CODES } from '../lib/mockData'
 
 export function EnseignePage() {
   const { id = '' } = useParams<{ id: string }>()
@@ -10,6 +10,7 @@ export function EnseignePage() {
   const e = ens(id)
   const cartes = CARTES.filter(c => c.enseigneId === id)
   const codes = CODES.filter(c => c.enseigneId === id)
+  const offres = giftcardOffres(id)
 
   return (
     <div className="screen scr-enter">
@@ -44,8 +45,36 @@ export function EnseignePage() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: 15 }}>Cashback actif</div>
                 <div className="dim" style={{ fontSize: 13, fontWeight: 600, marginTop: 1 }}>via {e.cashbackSource ? sourceLabel[e.cashbackSource] : '—'}</div>
+                {e.cashbackConditions && <div className="dim" style={{ fontSize: 12, fontWeight: 600, marginTop: 4 }}>{e.cashbackConditions}</div>}
               </div>
-              <div className="num" style={{ fontSize: 26, fontWeight: 700, color: 'var(--money)' }}>{e.cashbackPct}%</div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="num" style={{ fontSize: 26, fontWeight: 700, color: 'var(--money)' }}>{e.cashbackPct}%</div>
+                {e.cashbackUpdatedAt && <div className="dim" style={{ fontSize: 11, fontWeight: 600, marginTop: 2 }}>maj {e.cashbackUpdatedAt}</div>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* cartes cadeaux à prix réduit */}
+        {offres.length > 0 && (
+          <div className="pad" style={{ marginTop: 18 }}>
+            <div className="eyebrow" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Icon name="spark" size={15} color="var(--dim)" /> Cartes cadeaux à prix réduit
+            </div>
+            <div className="card" style={{ overflow: 'hidden' }}>
+              {offres.map(o => (
+                <div key={o.id} className="row" style={{ cursor: 'default' }}>
+                  <div style={{ width: 46, height: 46, borderRadius: 13, background: 'var(--money-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <span className="num" style={{ fontSize: 14, fontWeight: 700, color: 'var(--money)' }}>−{o.remisePct}%</span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>Carte cadeau {sourceLabel[o.source]}</div>
+                    <div className="dim" style={{ fontSize: 12.5, fontWeight: 600, marginTop: 2 }}>
+                      {o.montants.map(euro).join(', ')}{o.conditions ? ` · ${o.conditions}` : ''}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

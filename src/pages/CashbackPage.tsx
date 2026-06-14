@@ -1,10 +1,10 @@
 import { Icon } from '../components/Icon'
 import { LogoTile } from '../components/LogoTile'
 import { useToast } from '../hooks/useToast'
-import { ENSEIGNES, SOURCES } from '../lib/mockData'
+import { ens, euro, ENSEIGNES, OFFRES, SOURCES } from '../lib/mockData'
 import type { CashbackSource } from '../lib/types'
 
-const SRC_NAME: Record<CashbackSource, string> = { igraal: 'iGraal', widilo: 'Widilo', manual: 'Manuel' }
+const SRC_NAME: Record<CashbackSource, string> = { igraal: 'iGraal', widilo: 'Widilo', joko: 'Joko', uneo: 'Unéo', manual: 'Manuel' }
 
 export function CashbackPage() {
   const flash = useToast()
@@ -57,6 +57,26 @@ export function CashbackPage() {
                 <span className="num" style={{ fontSize: 20, fontWeight: 700, color: 'var(--money)' }}>{e.cashbackPct}%</span>
               </div>
             ))}
+          </div>
+        </div>
+
+        {/* giftcard offres */}
+        <div className="pad" style={{ marginTop: 26 }}>
+          <div className="eyebrow" style={{ marginBottom: 12 }}>Cartes cadeaux à prix réduit</div>
+          <div className="card" style={{ overflow: 'hidden' }}>
+            {OFFRES.map(o => {
+              const e = ens(o.enseigneId)
+              return (
+                <div key={o.id} className="row" style={{ cursor: 'default' }}>
+                  <LogoTile enseigne={e} size={42} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{e.nom}</div>
+                    <div className="dim" style={{ fontSize: 12, fontWeight: 600 }}>via {SRC_NAME[o.source]} · {o.montants.map(euro).join(', ')}</div>
+                  </div>
+                  <span className="pill pill-money">−{o.remisePct}%</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       </div>
